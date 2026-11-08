@@ -15,7 +15,7 @@ class Settings:
     # SophNet endpoints
     llm_base_url: str = "https://www.sophnet.com/api/open-apis/v1/chat/completions"
     video_gen_url: str = "https://www.sophnet.com/api/open-apis/projects/easyllms/videogenerator/generate"
-    video_query_url: str = "https://www.sophnet.com/api/open-apis/projects/easyllms/videogenerator/query"
+    video_query_url: str = "https://www.sophnet.com/api/open-apis/projects/easyllms/videogenerator/task/{task_id}"
 
     # File storage
     upload_dir: str = "uploads"
