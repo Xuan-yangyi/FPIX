@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>任务列表</h2>
+
+<div class="grid">
+    <div>
+        <label>状态筛选
+            <select name="status"
+                    hx-get="/api/tasks-rows"
+                    hx-target="#task-table-body"
+                    hx-trigger="change"
+                    hx-include="this">
+                <option value="">全部</option>
+                <option value="pending">待处理</option>
+                <option value="analyzing">分析中</option>
+                <option value="writing">生成文案</option>
+                <option value="storyboard">分镜头脚本</option>
+                <option value="generating_video">生成视频</option>
+                <option value="completed">已完成</option>
+                <option value="failed">失败</option>
+            </select>
+        </label>
+    </div>
+    <div style="text-align:right">
+        <button class="secondary" hx-get="/api/tasks-rows" hx-target="#task-table-body">
+            🔄 刷新
+        </button>
+    </div>
+</div>
+
+<table>
+    <thead>
+        <tr>
+            <th>缩略图</th>
+            <th>规格</th>
+            <th>状态</th>
+            <th>创建时间</th>
+            <th>操作</th>
+        </tr>
+    </thead>
+    <tbody id="task-table-body"
+           hx-get="/api/tasks-rows"
+           hx-trigger="load"
+           hx-swap="innerHTML">
+        <tr><td colspan="5" aria-busy="true">加载中...</td></tr>
+    </tbody>
+</table>
+{% endblock %}

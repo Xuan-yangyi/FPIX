@@ -1,0 +1,121 @@
+{% extends "base.html" %}
+{% block content %}
+{% set status = task.status %}
+{% set result = task.result %}
+{% set is_done = status in ('completed', 'failed') %}
+
+<h2>任务详情</h2>
+
+<progress value="{{ {'pending':5,'analyzing':25,'writing':40,'storyboard':60,'generating_video':80,'completed':100,'failed':100}.get(status, 5) }}" max="100"></progress>
+<p>
+    <strong>状态：</strong>
+    {% set labels = {'pending':'⏳ 等待中','analyzing':'🔍 分析图片','writing':'✍️ 生成文案','storyboard':'🎬 分镜头脚本','generating_video':'🎥 生成视频','completed':'✅ 完成','failed':'❌ 失败'} %}
+    {{ labels.get(status, status) }}
+    <small>| 模型：{{ task.llm_model }} / {{ task.video_model }}</small>
+    <small>| 创建时间：{{ task.created_at[:19] }}</small>
+</p>
+
+{% if status == 'failed' %}
+<article style="background:var(--pico-del-color, #fff0f0);border:1px solid var(--pico-color-red-200, #faa)">
+    <h4>❌ 任务失败</h4>
+    <pre style="white-space:pre-wrap;font-size:0.85rem">{{ task.error_message }}</pre>
+    <button hx-post="/api/tasks/{{ task.id }}/retry" hx-target="body" hx-swap="outerHTML">
+        🔄 重试任务
+    </button>
+</article>
+{% endif %}
+
+{% if result.image_analysis %}
+<article>
+    <h3>🔍 图片分析</h3>
+    <div class="grid">
+        {% for path in task.image_paths %}
+        <img src="/{{ path }}" alt="产品图" style="max-width:200px;border-radius:8px">
+        {% endfor %}
+    </div>
+    <table>
+        {% for k, v in result.image_analysis.items() %}
+        <tr>
+            <th>{{ k }}</th>
+            <td>
+                {% if v is not string and v is iterable %}
+                    {{ v | join('、') }}
+                {% else %}
+                    {{ v }}
+                {% endif %}
+            </td>
+        </tr>
+        {% endfor %}
+    </table>
+</article>
+{% endif %}
+
+{% if result.promo_texts %}
+<article>
+    <h3>✍️ 宣传文案</h3>
+    {% set pt = result.promo_texts %}
+    <h4>{{ pt.title }}</h4>
+    <p><em>{{ pt.short_description }}</em></p>
+    <h5>卖点</h5>
+    <ul>
+        {% for sp in pt.selling_points %}
+        <li>{{ sp }}</li>
+        {% endfor %}
+    </ul>
+    <h5>营销提示词</h5>
+    <pre style="white-space:pre-wrap">{{ pt.promotional_prompt }}</pre>
+    <h5>营销文案</h5>
+    <pre style="white-space:pre-wrap">{{ pt.marketing_copy }}</pre>
+</article>
+{% endif %}
+
+{% if result.storyboard %}
+<article>
+    <h3>🎬 分镜头脚本</h3>
+    {% for shot in result.storyboard %}
+    <details {% if loop.index == 1 %}open{% endif %}>
+        <summary>第 {{ shot.shot_number }} 镜 — {{ shot.duration_sec }}s</summary>
+        <dl>
+            <dt><strong>场景描述</strong></dt><dd>{{ shot.scene_description }}</dd>
+            <dt><strong>运镜方式</strong></dt><dd>{{ shot.camera_movement }}</dd>
+            <dt><strong>中文提示词</strong></dt><dd>{{ shot.cn_prompt }}</dd>
+            <dt><strong>英文提示词</strong></dt><dd>{{ shot.en_prompt }}</dd>
+            <dt><strong>旁白</strong></dt><dd>{{ shot.narration }}</dd>
+        </dl>
+    </details>
+    {% endfor %}
+</article>
+{% endif %}
+
+{% if result.videos %}
+<article>
+    <h3>🎥 生成视频</h3>
+    <div class="grid">
+    {% for v in result.videos %}
+        <div>
+            <h4>分镜头 {{ v.shot_index + 1 }}</h4>
+            {% if v.status == 'completed' and v.path %}
+            <video controls width="100%" style="max-width:400px;border-radius:8px">
+                <source src="/{{ v.path }}" type="video/mp4">
+            </video>
+            <p><a href="/api/tasks/{{ task.id }}/videos/{{ v.shot_index }}" download>⬇ 下载</a></p>
+            {% else %}
+            <p>❌ 生成失败：{{ v.get('error', '未知错误') }}</p>
+            {% endif %}
+        </div>
+    {% endfor %}
+    </div>
+</article>
+{% endif %}
+
+{% if not is_done %}
+<div id="auto-refresh"
+     hx-get="/tasks/{{ task.id }}"
+     hx-trigger="every 3s"
+     hx-target="body"
+     hx-swap="outerHTML"
+     hx-select="body">
+</div>
+{% endif %}
+
+{% endblock %}

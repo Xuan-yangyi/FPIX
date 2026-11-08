@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>设置</h2>
+
+<form hx-post="/api/config" hx-target="#config-result" hx-swap="innerHTML">
+    <fieldset>
+        <legend>API Key</legend>
+        <label>SophNet API Key
+            <input type="password" name="value" placeholder="输入 API Key" required>
+            <input type="hidden" name="key" value="api_key">
+        </label>
+    </fieldset>
+    <button type="submit">💾 保存 API Key</button>
+</form>
+
+<form hx-post="/api/config" hx-target="#config-result" hx-swap="innerHTML" style="margin-top:1rem">
+    <fieldset>
+        <legend>默认 LLM 模型</legend>
+        <input type="hidden" name="key" value="preferred_llm_model">
+        <select name="value">
+            {% for m in llm_models %}
+            <option value="{{ m }}">{{ m }}</option>
+            {% endfor %}
+        </select>
+    </fieldset>
+    <button type="submit">💾 保存</button>
+</form>
+
+<form hx-post="/api/config" hx-target="#config-result" hx-swap="innerHTML" style="margin-top:1rem">
+    <fieldset>
+        <legend>默认视频模型</legend>
+        <input type="hidden" name="key" value="preferred_video_model">
+        <select name="value">
+            {% for m in video_models %}
+            <option value="{{ m }}">{{ m }}</option>
+            {% endfor %}
+        </select>
+    </fieldset>
+    <button type="submit">💾 保存</button>
+</form>
+
+<div id="config-result"></div>
+
+<hr>
+<h3>当前配置</h3>
+<div hx-get="/api/config" hx-trigger="load" hx-swap="innerHTML">
+    <p aria-busy="true">加载中...</p>
+</div>
+{% endblock %}

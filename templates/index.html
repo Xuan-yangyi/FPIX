@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>创建新任务</h2>
+<form id="create-form"
+      hx-post="/api/tasks"
+      hx-encoding="multipart/form-data"
+      hx-target="#result"
+      hx-swap="innerHTML">
+
+    <label>产品图片（可多选）
+        <input type="file" name="images" accept="image/*" multiple required>
+    </label>
+
+    <fieldset>
+        <legend>产品规格</legend>
+        <div id="specs-container">
+            <div class="grid spec-row">
+                <input type="text" name="spec_key_0" placeholder="规格名（如：品类）" value="品类">
+                <input type="text" name="spec_value_0" placeholder="规格值（如：女装连衣裙）">
+            </div>
+            <div class="grid spec-row">
+                <input type="text" name="spec_key_1" placeholder="规格名" value="材质">
+                <input type="text" name="spec_value_1" placeholder="规格值">
+            </div>
+            <div class="grid spec-row">
+                <input type="text" name="spec_key_2" placeholder="规格名" value="风格">
+                <input type="text" name="spec_value_2" placeholder="规格值">
+            </div>
+            <div class="grid spec-row">
+                <input type="text" name="spec_key_3" placeholder="规格名" value="目标人群">
+                <input type="text" name="spec_value_3" placeholder="规格值">
+            </div>
+            <div class="grid spec-row">
+                <input type="text" name="spec_key_4" placeholder="规格名">
+                <input type="text" name="spec_value_4" placeholder="规格值">
+            </div>
+        </div>
+        <button type="button" class="secondary outline" onclick="addSpecRow()" style="margin-top:0.5rem">
+            + 添加规格
+        </button>
+    </fieldset>
+
+    <div class="grid">
+        <label>LLM 模型
+            <select name="llm_model">
+                <option value="DeepSeek-V4-Flash-Vision-Exp">DeepSeek-V4-Flash-Vision-Exp</option>
+                <option value="glm-4-flash">GLM-4-Flash</option>
+                <option value="kimi">Kimi</option>
+            </select>
+        </label>
+        <label>视频模型
+            <select name="video_model">
+                <option value="happyhorse-1.1-i2v">HappyHorse-1.1-i2v</option>
+                <option value="wan2.7">WAN 2.7</option>
+            </select>
+        </label>
+    </div>
+
+    <input type="hidden" name="specs" id="specs-json">
+
+    <button type="submit" onclick="prepareSpecs()">🚀 开始生成</button>
+</form>
+
+<div id="result"></div>
+
+<script>
+let specCounter = 5;
+function addSpecRow() {
+    const container = document.getElementById('specs-container');
+    const row = document.createElement('div');
+    row.className = 'grid spec-row';
+    row.innerHTML = `
+        <input type="text" name="spec_key_${specCounter}" placeholder="规格名">
+        <input type="text" name="spec_value_${specCounter}" placeholder="规格值">
+    `;
+    container.appendChild(row);
+    specCounter++;
+}
+function prepareSpecs() {
+    const rows = document.querySelectorAll('.spec-row');
+    const specs = {};
+    rows.forEach(row => {
+        const keyInput = row.querySelector('input[name^="spec_key_"]');
+        const valInput = row.querySelector('input[name^="spec_value_"]');
+        if (keyInput && valInput && keyInput.value.trim()) {
+            specs[keyInput.value.trim()] = valInput.value.trim();
+        }
+    });
+    document.getElementById('specs-json').value = JSON.stringify(specs);
+}
+</script>
+{% endblock %}
