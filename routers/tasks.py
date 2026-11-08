@@ -4,8 +4,8 @@ import os
 import shutil
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
-from fastapi.responses import FileResponse
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
+from fastapi.responses import FileResponse, Response
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -19,6 +19,7 @@ router = APIRouter(prefix="/api/tasks", tags=["tasks"])
 
 @router.post("")
 async def create_task(
+    request: Request,
     images: list[UploadFile] = File(...),
     specs: str = Form(...),
     llm_model: str = Form(default=SETTINGS.preferred_llm_model),
@@ -58,6 +59,12 @@ async def create_task(
 
     asyncio.create_task(execute_workflow(task.id))
 
+    # HTMX form submission: use HX-Redirect for full page navigation
+    if request.headers.get("hx-request"):
+        return Response(
+            status_code=200,
+            headers={"HX-Redirect": f"/tasks/{task.id}"},
+        )
     return {"task_id": task.id, "status": "pending"}
 
 
