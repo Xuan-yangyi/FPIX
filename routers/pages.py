@@ -75,6 +75,7 @@ async def page_settings(request: Request, db: AsyncSession = Depends(get_db)):
             "kimi",
         ],
         "video_models": [
+            "happyhorse-1.0-r2v",
             "wan2.7",
             "happyhorse-1.1-i2v",
         ],

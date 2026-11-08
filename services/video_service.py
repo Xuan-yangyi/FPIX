@@ -22,21 +22,23 @@ def _image_to_data_url(image_path: str) -> str:
 async def submit_video_generation(
     client: SophNetClient,
     model: str,
-    image_path: str,
+    image_paths: list[str],
     prompt_text: str,
     duration: int = 5,
     resolution: str = "720P",
+    ratio: str = "16:9",
 ) -> dict:
-    """Submit a video generation task. Returns the SophNet response containing the task ID."""
-    content = [
-        {
+    """Submit a video generation task. Supports multiple reference images for r2v models."""
+    content = []
+    for img_path in image_paths:
+        content.append({
             "type": "image_url",
-            "role": "first_frame",
-            "image_url": {"url": _image_to_data_url(image_path)},
-        },
-        {"type": "text", "text": prompt_text},
-    ]
-    parameters = {"duration": duration, "resolution": resolution}
+            "role": "reference_image",
+            "image_url": {"url": _image_to_data_url(img_path)},
+        })
+    content.append({"type": "text", "text": prompt_text})
+
+    parameters = {"duration": duration, "resolution": resolution, "ratio": ratio}
     return await client.generate_video(model, content, parameters)
 
 
@@ -102,13 +104,16 @@ async def generate_and_download(
     client: SophNetClient,
     video_task,  # VideoTask ORM instance
     model: str,
+    image_paths: list[str] | None = None,
     duration: int = 5,
     resolution: str = "720P",
+    ratio: str = "16:9",
     on_update: callable | None = None,
 ) -> str:
     """Full video generation pipeline: submit → poll → download. Returns local file path."""
+    paths = image_paths or [video_task.input_image]
     submit_result = await submit_video_generation(
-        client, model, video_task.input_image, video_task.prompt, duration, resolution
+        client, model, paths, video_task.prompt, duration, resolution, ratio
     )
     # SophNet response: {"status": 0, "result": {"task_id": "..."}, ...}
     inner = submit_result.get("result", {})

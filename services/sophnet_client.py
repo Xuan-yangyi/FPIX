@@ -72,10 +72,10 @@ class SophNetClient:
         return resp.json()
 
     async def query_video_task(self, task_id: str) -> dict:
-        """Query the status of a video generation task."""
+        """Query the status of a video generation task via POST."""
         client = await self._get_client()
-        resp = await client.get(
-            SETTINGS.video_query_url, params={"task_id": task_id}
+        resp = await client.post(
+            SETTINGS.video_query_url, json={"task_id": task_id}
         )
         resp.raise_for_status()
         return resp.json()

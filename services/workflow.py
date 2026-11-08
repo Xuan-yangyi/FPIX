@@ -118,13 +118,14 @@ async def execute_workflow(task_id: str) -> None:
                 if vt is None:
                     continue
 
-            m_image = image_paths[0]
             en_prompt = shot.get("en_prompt", shot.get("cn_prompt", ""))
 
             try:
                 vt.status = "processing"
                 local_path = await generate_and_download(
-                    client, vt, video_model, duration=5, resolution="720P"
+                    client, vt, video_model,
+                    image_paths=image_paths,
+                    duration=5, resolution="720P", ratio="16:9",
                 )
                 vt.status = "completed"
                 vt.video_path = local_path
