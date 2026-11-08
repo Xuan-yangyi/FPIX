@@ -6,7 +6,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from database import get_db
-from models import Task, VideoTask
+from models import Config, Task, VideoTask
 from settings import SETTINGS
 
 router = APIRouter(tags=["pages"])
@@ -61,9 +61,14 @@ async def page_task_detail(request: Request, task_id: str, db: AsyncSession = De
 
 
 @router.get("/settings", response_class=HTMLResponse)
-async def page_settings(request: Request):
+async def page_settings(request: Request, db: AsyncSession = Depends(get_db)):
+    result = await db.execute(select(Config))
+    configs = result.scalars().all()
+    saved_config = {c.key: c.value for c in configs}
+
     return request.app.state.templates.TemplateResponse("settings.html", {
         "request": request,
+        "saved_config": saved_config,
         "llm_models": [
             "DeepSeek-V4-Flash-Vision-Exp",
             "glm-4-flash",
