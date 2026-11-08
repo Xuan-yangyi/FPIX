@@ -9,7 +9,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from database import async_session
-from models import Task, VideoTask
+from models import Config, Task, VideoTask
 from services.llm_service import analyze_image, generate_promo_texts, generate_storyboard
 from services.sophnet_client import SophNetClient, SophNetError
 from services.video_service import generate_and_download
@@ -65,7 +65,12 @@ def _image_to_base64(image_path: str) -> str:
 
 async def execute_workflow(task_id: str) -> None:
     """Execute the full 4-stage workflow for a task."""
-    client = SophNetClient()
+    # Load API key from database (user may have set it via settings page)
+    async with async_session() as db:
+        result = await db.execute(select(Config).where(Config.key == "api_key"))
+        config_row = result.scalar_one_or_none()
+        api_key = config_row.value if config_row else ""
+    client = SophNetClient(api_key=api_key)
     try:
         # Load task
         async with async_session() as db:
