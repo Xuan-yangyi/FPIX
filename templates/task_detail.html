@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% block content %}
+<div id="task-content">
 {% set status = task.status %}
 {% set result = task.result %}
 {% set is_done = status in ('completed', 'failed') %}
@@ -19,7 +20,7 @@
 <article style="background:var(--pico-del-color, #fff0f0);border:1px solid var(--pico-color-red-200, #faa)">
     <h4>❌ 任务失败</h4>
     <pre style="white-space:pre-wrap;font-size:0.85rem">{{ task.error_message }}</pre>
-    <button hx-post="/api/tasks/{{ task.id }}/retry" hx-target="body" hx-swap="outerHTML">
+    <button hx-post="/api/tasks/{{ task.id }}/retry" hx-target="#task-content" hx-swap="innerHTML">
         🔄 重试任务
     </button>
 </article>
@@ -109,13 +110,15 @@
 {% endif %}
 
 {% if not is_done %}
-<div id="auto-refresh"
-     hx-get="/tasks/{{ task.id }}"
-     hx-trigger="every 3s"
-     hx-target="body"
-     hx-swap="outerHTML"
-     hx-select="body">
-</div>
+<p id="auto-refresh"
+   hx-get="/tasks/{{ task.id }}"
+   hx-trigger="every 3s"
+   hx-target="#task-content"
+   hx-swap="outerHTML"
+   hx-select="#task-content">
+   <small>⏳ 自动刷新中...</small>
+</p>
 {% endif %}
 
+</div>{# end #task-content #}
 {% endblock %}
