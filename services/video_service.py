@@ -40,26 +40,53 @@ async def submit_video_generation(
     return await client.generate_video(model, content, parameters)
 
 
+def _extract_video_status(response: dict) -> tuple[str, str | None]:
+    """Extract (status, video_url_or_error) from SophNet query response.
+
+    Handles both raw format and SophNet-wrapped format:
+      Raw:   {"status": "completed", "result": {"video_url": "..."}}
+      Wrapped: {"status": 0, "result": {"status": "completed", "video_url": "..."}}
+    """
+    inner = response.get("result", {})
+    if isinstance(inner, dict) and "status" in inner and isinstance(inner["status"], str):
+        # Wrapped format: status is a string inside result
+        status = inner["status"]
+        if status == "completed":
+            url = inner.get("video_url") or inner.get("result", {}).get("video_url")
+            return ("completed", url)
+        elif status == "failed":
+            error = inner.get("error") or inner.get("message", "Unknown error")
+            return ("failed", error)
+        else:
+            return (status, None)
+    else:
+        # Raw format: status at top level
+        status = str(response.get("status", ""))
+        if status == "completed":
+            url = response.get("result", {}).get("video_url") if isinstance(response.get("result"), dict) else None
+            return ("completed", url)
+        elif status == "failed":
+            return ("failed", str(response.get("error", "Unknown error")))
+        else:
+            return ("processing", None)
+
+
 async def poll_video_task(
     client: SophNetClient, sophnet_task_id: str, on_update: callable | None = None
 ) -> str:
     """Poll video task status until completion or timeout. Returns the video download URL."""
     max_attempts = SETTINGS.video_timeout_sec // SETTINGS.video_poll_interval_sec
     for _ in range(max_attempts):
-        result = await client.query_video_task(sophnet_task_id)
-        status = result.get("status", "")
+        response = await client.query_video_task(sophnet_task_id)
+        status, value = _extract_video_status(response)
 
         if status == "completed":
-            video_url = result.get("result", {}).get("video_url", "")
-            if not video_url and "result" in result and isinstance(result["result"], str):
-                video_url = result["result"]
-            if not video_url:
-                raise SophNetError(f"Video completed but no video_url in response: {result}")
-            return video_url
+            if not value:
+                raise SophNetError(f"Video completed but no video_url in response: {response}")
+            return value
 
         if status == "failed":
-            error_msg = result.get("error", "Unknown error")
-            raise SophNetError(f"Video generation failed: {error_msg}")
+            raise SophNetError(f"Video generation failed: {value}")
 
         if on_update:
             on_update(status)
@@ -83,12 +110,12 @@ async def generate_and_download(
     submit_result = await submit_video_generation(
         client, model, video_task.input_image, video_task.prompt, duration, resolution
     )
-    sophnet_task_id = submit_result.get("task_id") or submit_result.get("data", {}).get("task_id")
+    # SophNet response: {"status": 0, "result": {"task_id": "..."}, ...}
+    inner = submit_result.get("result", {})
+    sophnet_task_id = inner.get("task_id") if isinstance(inner, dict) else None
     if not sophnet_task_id:
-        sophnet_task_id = (
-            submit_result.get("data", {}).get("task_id")
-            or submit_result.get("taskId")
-        )
+        # fallback: try direct keys
+        sophnet_task_id = submit_result.get("task_id") or submit_result.get("taskId")
     if not sophnet_task_id:
         raise SophNetError(f"Cannot extract task_id from response: {submit_result}")
 
