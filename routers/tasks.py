@@ -95,7 +95,12 @@ async def task_progress(task_id: str):
         async with async_session() as db:
             task = await db.get(Task, task_id)
             if task:
-                current_result = json.loads(task.result)
+                current_result = {}
+                if task.result:
+                    try:
+                        current_result = json.loads(task.result)
+                    except (json.JSONDecodeError, TypeError):
+                        current_result = {}
                 if current_result:
                     yield f"data: {json.dumps({'stage': task.status, **current_result})}\n\n"
                 if task.status == "completed":
