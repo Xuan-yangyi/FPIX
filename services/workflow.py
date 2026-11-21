@@ -471,5 +471,6 @@ async def _run_video(client: SophNetClient, task_id: str):
             await db.commit()
 
     rel_path = videos_result[0]["path"].replace(SETTINGS.output_dir, "/outputs") if videos_result else ""
-    await _update_task_status(task_id, "completed", video=videos_result[0] if videos_result else None)
-    await _broadcast_progress(task_id, "completed", video_path=rel_path)
+    result_images = [{"type": "video", "path": rel_path}]
+    await _update_task_status(task_id, "completed", result_images=result_images)
+    await _broadcast_progress(task_id, "completed", result_images=result_images, type="video")

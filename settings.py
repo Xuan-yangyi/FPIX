@@ -9,7 +9,7 @@ class Settings:
         default_factory=lambda: os.getenv("PREFERRED_LLM_MODEL", "DeepSeek-V4-Flash-Vision-Exp")
     )
     preferred_video_model: str = field(
-        default_factory=lambda: os.getenv("PREFERRED_VIDEO_MODEL", "happyhorse-1.0-r2v")
+        default_factory=lambda: os.getenv("PREFERRED_VIDEO_MODEL", "happyhorse-1.1-i2v")
     )
 
     # SophNet endpoints

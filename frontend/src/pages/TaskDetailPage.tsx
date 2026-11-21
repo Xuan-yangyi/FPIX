@@ -23,6 +23,8 @@ export function TaskDetailPage() {
   }
 
   const resultImages = task.result?.result_images || []
+  const videoResult = resultImages.find((r: any) => r.type === 'video')
+  const imageResults = resultImages.filter((r: any) => r.type !== 'video')
 
   const statusBadge: Record<string, string> = {
     pending: 'bg-yellow-500/20 text-yellow-400',
@@ -43,15 +45,13 @@ export function TaskDetailPage() {
         </span>
       </div>
 
-      {task.status === 'completed' && resultImages.length > 0 && (
-        <ImageGallery images={resultImages} />
+      {task.status === 'completed' && imageResults.length > 0 && (
+        <ImageGallery images={imageResults} />
       )}
 
-      {task.status === 'completed' && task.result?.video && (
+      {task.status === 'completed' && videoResult && (
         <div className="mt-6">
-          {task.result.video.path && (
-            <video controls className="w-full rounded-xl" src={task.result.video.path} />
-          )}
+          <video controls className="w-full rounded-xl" src={videoResult.path} />
         </div>
       )}
 
