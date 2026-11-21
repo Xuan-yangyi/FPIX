@@ -1,8 +1,10 @@
 from contextlib import asynccontextmanager
+import os
 
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
-from fastapi.templating import Jinja2Templates
 
 from database import init_db
 from routers.config import router as config_router
@@ -13,11 +15,19 @@ from routers.tasks import router as tasks_router
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     await init_db()
-    app.state.templates = Jinja2Templates(directory="templates")
     yield
 
 
 app = FastAPI(title="电商AI内容生产工具", lifespan=lifespan)
+
+# CORS for local dev
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # Static files
 app.mount("/static", StaticFiles(directory="static"), name="static")
@@ -28,6 +38,20 @@ app.mount("/outputs", StaticFiles(directory="outputs"), name="outputs")
 app.include_router(pages_router)
 app.include_router(tasks_router)
 app.include_router(config_router)
+
+# Serve React SPA from frontend/dist
+frontend_dist = os.path.join(os.path.dirname(__file__), "frontend", "dist")
+if os.path.exists(frontend_dist):
+    app.mount("/assets", StaticFiles(directory=os.path.join(frontend_dist, "assets")), name="spa_assets")
+
+    @app.get("/{full_path:path}")
+    async def serve_spa(full_path: str = ""):
+        """Serve React SPA — catch-all that returns index.html for client-side routing."""
+        # API routes are already handled by routers, this only catches non-API paths
+        index_path = os.path.join(frontend_dist, "index.html")
+        if os.path.exists(index_path):
+            return FileResponse(index_path)
+        return FileResponse(index_path, status_code=404)
 
 
 if __name__ == "__main__":
