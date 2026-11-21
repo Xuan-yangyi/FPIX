@@ -425,11 +425,19 @@ async def _run_video(client: SophNetClient, task_id: str):
 
     # Stage 4: Video Generation
     await _broadcast_progress(task_id, "generating_video", message="正在生成视频...")
+
+    # Serialize storyboard (list of shots) into a single prompt for 15-second video
+    if isinstance(storyboard, list) and storyboard:
+        # Combine all shots into narrative prompt
+        combined_prompt = json.dumps(storyboard, ensure_ascii=False) if storyboard else ""
+    else:
+        combined_prompt = ""
+
     async with async_session() as db:
         vt = VideoTask(
             task_id=task_id,
             shot_index="0",
-            prompt=storyboard.get("en_prompt", storyboard.get("cn_prompt", "")),
+            prompt=combined_prompt,
             input_image=image_paths[0] if image_paths else "",
             status="pending",
         )
