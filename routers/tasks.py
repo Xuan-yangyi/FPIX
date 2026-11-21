@@ -2,19 +2,154 @@ import asyncio
 import json
 import os
 import shutil
+import uuid
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
-from fastapi.responses import FileResponse, Response
+from fastapi.responses import FileResponse, Response, StreamingResponse
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from database import get_db
+from database import get_db, async_session
 from models import Task, VideoTask
-from services.workflow import execute_workflow
+from services.workflow import execute_workflow, get_progress_queue
 from settings import SETTINGS
 
 router = APIRouter(prefix="/api/tasks", tags=["tasks"])
+
+
+@router.post("/upload")
+async def upload_images(
+    images: list[UploadFile] = File(...),
+):
+    """Upload images and return file paths. Used by React frontend before task creation."""
+    if not images:
+        raise HTTPException(status_code=400, detail="No images provided")
+    if len(images) > 9:
+        raise HTTPException(status_code=400, detail="最多支持 9 张图片")
+
+    batch_id = uuid.uuid4().hex[:8]
+    batch_dir = os.path.join(SETTINGS.upload_dir, f"batch_{batch_id}")
+    os.makedirs(batch_dir, exist_ok=True)
+
+    file_paths = []
+    for img in images:
+        contents = await img.read()
+        if len(contents) > SETTINGS.max_image_size_mb * 1024 * 1024:
+            raise HTTPException(status_code=400, detail=f"Image {img.filename} exceeds {SETTINGS.max_image_size_mb}MB limit")
+        safe_name = img.filename or "image.jpg"
+        file_path = os.path.join(batch_dir, safe_name)
+        with open(file_path, "wb") as f:
+            f.write(contents)
+        file_paths.append(file_path)
+
+    return {"file_paths": file_paths, "batch_id": batch_id}
+
+
+@router.post("/json")
+async def create_task_json(request: Request, db: AsyncSession = Depends(get_db)):
+    """Create a new task from JSON body (React frontend)."""
+    body = await request.json()
+
+    workflow_type = body.get("workflow_type", "video")
+    image_paths = body.get("image_paths", [])
+    params = body.get("params", {})
+    user_requirements = body.get("user_requirements", "")
+    llm_model = body.get("llm_model", SETTINGS.preferred_llm_model)
+    video_model = body.get("video_model", SETTINGS.preferred_video_model)
+    image_model = body.get("image_model", "qwen-image-plus")
+    specs = body.get("specs", {})
+
+    # Validate images exist
+    for p in image_paths:
+        if not os.path.exists(p):
+            raise HTTPException(status_code=400, detail=f"Image not found: {p}")
+
+    task = Task(
+        workflow_type=workflow_type,
+        llm_model=llm_model,
+        video_model=video_model,
+        image_model=image_model,
+        specs=json.dumps(specs, ensure_ascii=False),
+        params=json.dumps(params, ensure_ascii=False),
+        user_requirements=user_requirements,
+        image_paths=json.dumps(image_paths, ensure_ascii=False),
+    )
+    db.add(task)
+    await db.commit()
+
+    asyncio.create_task(execute_workflow(task.id))
+
+    return {"task_id": task.id, "status": "pending"}
+
+
+@router.get("/{task_id}/progress")
+async def task_progress(task_id: str):
+    """SSE endpoint for real-time task progress updates."""
+    async def event_stream():
+        q = get_progress_queue(task_id)
+        # Send initial connection event
+        yield f"data: {json.dumps({'stage': 'connected', 'message': 'SSE connected'})}\n\n"
+
+        # Send current task state if already progressed
+        async with async_session() as db:
+            task = await db.get(Task, task_id)
+            if task:
+                current_result = json.loads(task.result)
+                if current_result:
+                    yield f"data: {json.dumps({'stage': task.status, **current_result})}\n\n"
+                if task.status == "completed":
+                    yield f"data: {json.dumps({'stage': 'completed', 'result_images': current_result.get('result_images', [])})}\n\n"
+                    return
+                if task.status == "failed":
+                    yield f"data: {json.dumps({'stage': 'failed', 'error': task.error_message})}\n\n"
+                    return
+
+        try:
+            while True:
+                event = await asyncio.wait_for(q.get(), timeout=30.0)
+                yield f"data: {json.dumps(event, ensure_ascii=False)}\n\n"
+                if event.get("stage") in ("completed", "failed"):
+                    break
+        except asyncio.TimeoutError:
+            # Send keepalive
+            yield f"data: {json.dumps({'stage': 'processing'})}\n\n"
+
+    return StreamingResponse(
+        event_stream(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )
+
+
+@router.get("/gallery/list")
+async def gallery(db: AsyncSession = Depends(get_db)):
+    """Return recent completed tasks for the homepage gallery."""
+    stmt = (
+        select(Task)
+        .where(Task.status == "completed")
+        .order_by(Task.created_at.desc())
+        .limit(20)
+    )
+    result = await db.execute(stmt)
+    tasks = result.scalars().all()
+
+    return {
+        "tasks": [
+            {
+                "id": t.id,
+                "workflow_type": t.workflow_type,
+                "status": t.status,
+                "result": json.loads(t.result),
+                "created_at": t.created_at,
+            }
+            for t in tasks
+        ]
+    }
 
 
 @router.post("")
