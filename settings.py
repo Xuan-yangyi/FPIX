@@ -17,6 +17,16 @@ class Settings:
     video_gen_url: str = "https://www.sophnet.com/api/open-apis/projects/easyllms/videogenerator/generate"
     video_query_url: str = "https://www.sophnet.com/api/open-apis/projects/easyllms/videogenerator/task/{task_id}"
 
+    # SophNet image generation endpoints
+    image_gen_url: str = "https://www.sophnet.com/api/open-apis/projects/easyllms/imagegenerator/generate"
+    image_query_url: str = "https://www.sophnet.com/api/open-apis/projects/easyllms/imagegenerator/task/{task_id}"
+    image_edit_url: str = "https://www.sophnet.com/api/open-apis/projects/easyllms/imageeditor/edit"
+    image_edit_query_url: str = "https://www.sophnet.com/api/open-apis/projects/easyllms/imageeditor/task/{task_id}"
+
+    # Polling
+    image_poll_interval_sec: int = 3
+    image_timeout_sec: int = 300
+
     # File storage
     upload_dir: str = "uploads"
     output_dir: str = "outputs"

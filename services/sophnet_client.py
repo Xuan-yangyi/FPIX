@@ -79,6 +79,48 @@ class SophNetClient:
         resp.raise_for_status()
         return resp.json()
 
+    async def generate_image(
+        self, model: str, content: list[dict], parameters: dict | None = None
+    ) -> dict:
+        """Submit an image generation task to SophNet."""
+        client = await self._get_client()
+        body: dict = {"model": model, "content": content}
+        if parameters:
+            body["parameters"] = parameters
+
+        resp = await client.post(SETTINGS.image_gen_url, json=body)
+        resp.raise_for_status()
+        return resp.json()
+
+    async def edit_image(
+        self, model: str, content: list[dict], parameters: dict | None = None
+    ) -> dict:
+        """Submit an image editing task to SophNet."""
+        client = await self._get_client()
+        body: dict = {"model": model, "content": content}
+        if parameters:
+            body["parameters"] = parameters
+
+        resp = await client.post(SETTINGS.image_edit_url, json=body)
+        resp.raise_for_status()
+        return resp.json()
+
+    async def query_image_task(self, task_id: str) -> dict:
+        """Query the status of an image generation/editing task."""
+        client = await self._get_client()
+        url = SETTINGS.image_query_url.format(task_id=task_id)
+        resp = await client.get(url)
+        resp.raise_for_status()
+        return resp.json()
+
+    async def query_edit_task(self, task_id: str) -> dict:
+        """Query the status of an image editing task."""
+        client = await self._get_client()
+        url = SETTINGS.image_edit_query_url.format(task_id=task_id)
+        resp = await client.get(url)
+        resp.raise_for_status()
+        return resp.json()
+
     async def download_file(self, url: str, dest_path: str) -> None:
         """Download a file (e.g. generated video) to local path."""
         client = await self._get_client()
