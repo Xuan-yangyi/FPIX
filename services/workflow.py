@@ -414,13 +414,13 @@ async def _run_video(client: SophNetClient, task_id: str):
 
     # Stage 2: Promo Texts
     await _broadcast_progress(task_id, "writing", message="正在生成宣传文案...")
-    promo_texts = await generate_promo_texts(client, llm_model, analysis, specs)
+    promo_texts = await generate_promo_texts(client, llm_model, analysis, specs, user_requirements)
     await _update_task_status(task_id, "processing", promo_texts=promo_texts)
 
     # Stage 3: Storyboard
     await _broadcast_progress(task_id, "storyboard", message="正在设计视频分镜...")
     product_info = json.dumps({"analysis": analysis, "specs": specs}, ensure_ascii=False)
-    storyboard = await generate_storyboard(client, llm_model, product_info, promo_texts)
+    storyboard = await generate_storyboard(client, llm_model, product_info, promo_texts, user_requirements)
     await _update_task_status(task_id, "processing", storyboard=storyboard)
 
     # Stage 4: Video Generation
@@ -442,6 +442,7 @@ async def _run_video(client: SophNetClient, task_id: str):
             status="pending",
         )
         db.add(vt)
+        await db.commit()
 
     videos_result = []
     vt.status = "processing"
