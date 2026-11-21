@@ -34,14 +34,14 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
 app.mount("/outputs", StaticFiles(directory="outputs"), name="outputs")
 
-# Routers
-app.include_router(pages_router)
+# API routers — always active
 app.include_router(tasks_router)
 app.include_router(config_router)
 
 # Serve React SPA from frontend/dist
 frontend_dist = os.path.join(os.path.dirname(__file__), "frontend", "dist")
 if os.path.exists(frontend_dist):
+    # SPA mode: serve React frontend
     app.mount("/assets", StaticFiles(directory=os.path.join(frontend_dist, "assets")), name="spa_assets")
 
     @app.get("/{full_path:path}")
@@ -52,6 +52,9 @@ if os.path.exists(frontend_dist):
         if os.path.exists(index_path):
             return FileResponse(index_path)
         return FileResponse(index_path, status_code=404)
+else:
+    # Fallback: Jinja2 pages (transitional — removed once React SPA is built)
+    app.include_router(pages_router)
 
 
 if __name__ == "__main__":
