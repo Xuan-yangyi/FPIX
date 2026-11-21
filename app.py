@@ -52,6 +52,14 @@ if os.path.exists(frontend_dist):
         if os.path.exists(index_path):
             return FileResponse(index_path)
         return FileResponse(index_path, status_code=404)
+
+    @app.get("/settings")
+    async def serve_settings():
+        """Explicit route for /settings — served by the SPA (client-side routed)."""
+        index_path = os.path.join(frontend_dist, "index.html")
+        if os.path.exists(index_path):
+            return FileResponse(index_path)
+        return FileResponse(index_path, status_code=404)
 else:
     # Fallback: Jinja2 pages (transitional — removed once React SPA is built)
     app.include_router(pages_router)
