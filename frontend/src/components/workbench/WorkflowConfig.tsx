@@ -100,10 +100,10 @@ export function WorkflowConfig({ type, params, onParamChange }: Props) {
         <div className="space-y-4">
           <div>
             <label className={labelClass}>LLM 模型</label>
-            <select className={inputClass} value={params.llm_model || 'DeepSeek-V4-Flash-Vision-Exp'}
+            <select className={inputClass} value={params.llm_model || 'gpt-4o'}
                     onChange={e => onParamChange('llm_model', e.target.value)}>
-              <option value="DeepSeek-V4-Flash-Vision-Exp">DeepSeek-V4-Flash-Vision-Exp</option>
-              <option value="glm-4-flash">GLM-4-Flash</option>
+              <option value="gpt-4o">GPT-4o (推荐)</option>
+              <option value="qwen-plus">Qwen-Plus</option>
             </select>
           </div>
           <div>

@@ -26,17 +26,11 @@ async def submit_image_generation(
     prompt_text: str,
     parameters: dict | None = None,
 ) -> dict:
-    """Submit an image generation task with reference images."""
-    content = []
-    for img_path in image_paths:
-        content.append({
-            "type": "image_url",
-            "role": "reference_image",
-            "image_url": {"url": _image_to_data_url(img_path)},
-        })
-    content.append({"type": "text", "text": prompt_text})
-
-    return await client.generate_image(model, content, parameters)
+    """Submit an image generation task with optional reference images."""
+    images = [_image_to_data_url(p) for p in image_paths] if image_paths else None
+    if parameters is None:
+        parameters = {"size": "1328*1328"}
+    return await client.generate_image(model, prompt_text, images, parameters)
 
 
 async def submit_image_edit(
@@ -47,31 +41,36 @@ async def submit_image_edit(
     parameters: dict | None = None,
 ) -> dict:
     """Submit an image editing task."""
-    content = [
-        {"type": "image_url", "role": "input_image", "image_url": {"url": _image_to_data_url(image_path)}},
-        {"type": "text", "text": prompt_text},
-    ]
-    return await client.edit_image(model, content, parameters)
+    images = [_image_to_data_url(image_path)] if image_path else None
+    if parameters is None:
+        parameters = {"size": "1328*1328"}
+    return await client.generate_image(model, prompt_text, images, parameters)
+
+
+def _extract_task_id(response: dict) -> str | None:
+    """Extract task_id from SophNet image generation response.
+    Response format: {"output": {"taskId": "xxx", "taskStatus": "PENDING"}}
+    """
+    output = response.get("output", {})
+    task_id = output.get("taskId") if isinstance(output, dict) else None
+    return task_id
 
 
 def _extract_image_status(response: dict) -> tuple[str, str | None]:
-    """Extract (status, image_url_or_error) from SophNet query response."""
-    status = response.get("status", "")
+    """Extract (status, image_url_or_error) from SophNet query response.
+    Response format: {"output": {"taskId": "...", "taskStatus": "SUCCEEDED/FAILED/PENDING", "results": [{"url": "..."}]}}
+    """
+    output = response.get("output", {})
+    status = output.get("taskStatus", "") if isinstance(output, dict) else ""
 
-    if status in ("succeeded", "completed", "success"):
-        content = response.get("content", {})
-        url = content.get("image_url") if isinstance(content, dict) else None
-        if not url:
-            # Try result array format
-            results = response.get("result", [])
-            if isinstance(results, list) and results:
-                url = results[0].get("image_url") or results[0].get("url")
-        return ("completed", url)
+    if status in ("SUCCEEDED",):
+        results = output.get("results", [])
+        if isinstance(results, list) and results:
+            url = results[0].get("url")
+            return ("completed", url)
 
-    if status in ("failed", "error"):
-        error_obj = response.get("error", {})
-        error_msg = error_obj.get("message", "Unknown error") if isinstance(error_obj, dict) else str(error_obj)
-        return ("failed", error_msg)
+    if status in ("FAILED",):
+        return ("failed", output.get("message", "Unknown error"))
 
     return ("processing", None)
 
@@ -110,13 +109,9 @@ async def generate_and_download_image(
     """Full image generation pipeline: submit → poll → download. Returns local file path."""
     submit_result = await submit_image_generation(client, model, image_paths, prompt_text)
 
-    # Extract task_id from SophNet response
-    inner = submit_result.get("result", {})
-    sophnet_task_id = inner.get("task_id") if isinstance(inner, dict) else None
+    sophnet_task_id = _extract_task_id(submit_result)
     if not sophnet_task_id:
-        sophnet_task_id = submit_result.get("task_id") or submit_result.get("taskId")
-    if not sophnet_task_id:
-        raise SophNetError(f"Cannot extract task_id from response: {submit_result}")
+        raise SophNetError(f"Cannot extract taskId from response: {submit_result}")
 
     image_url = await poll_image_task(client, sophnet_task_id)
 

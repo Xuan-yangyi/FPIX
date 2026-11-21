@@ -80,29 +80,28 @@ class SophNetClient:
         return resp.json()
 
     async def generate_image(
-        self, model: str, content: list[dict], parameters: dict | None = None
+        self, model: str, prompt: str, images: list[str] | None = None,
+        parameters: dict | None = None
     ) -> dict:
-        """Submit an image generation task to SophNet."""
+        """Submit an image generation task to SophNet.
+
+        Uses the unified imagegenerator/task endpoint.
+        - model: 'Qwen-Image' for both generation and editing
+        - prompt: text prompt for generation/editing
+        - images: list of image URLs or data URIs (optional, for reference/edit)
+        """
         client = await self._get_client()
-        body: dict = {"model": model, "content": content}
+        inp: dict = {"prompt": prompt}
+        if images:
+            inp["images"] = images
+        body: dict = {"model": model, "input": inp}
         if parameters:
             body["parameters"] = parameters
 
         resp = await client.post(SETTINGS.image_gen_url, json=body)
-        resp.raise_for_status()
-        return resp.json()
-
-    async def edit_image(
-        self, model: str, content: list[dict], parameters: dict | None = None
-    ) -> dict:
-        """Submit an image editing task to SophNet."""
-        client = await self._get_client()
-        body: dict = {"model": model, "content": content}
-        if parameters:
-            body["parameters"] = parameters
-
-        resp = await client.post(SETTINGS.image_edit_url, json=body)
-        resp.raise_for_status()
+        if resp.status_code >= 400:
+            body_snip = resp.text[:300] if resp.text else "(no body)"
+            raise SophNetError(f"Image API {resp.status_code}: {body_snip}")
         return resp.json()
 
     async def query_image_task(self, task_id: str) -> dict:
@@ -113,19 +112,34 @@ class SophNetClient:
         resp.raise_for_status()
         return resp.json()
 
+    async def edit_image(
+        self, model: str, prompt: str, images: list[str] | None = None,
+        parameters: dict | None = None
+    ) -> dict:
+        """Submit an image editing task (alias for generate_image with edit model)."""
+        return await self.generate_image(model, prompt, images, parameters)
+
     async def query_edit_task(self, task_id: str) -> dict:
-        """Query the status of an image editing task."""
-        client = await self._get_client()
-        url = SETTINGS.image_edit_query_url.format(task_id=task_id)
-        resp = await client.get(url)
-        resp.raise_for_status()
-        return resp.json()
+        """Query the status of an image editing task (alias for query_image_task)."""
+        return await self.query_image_task(task_id)
 
     async def download_file(self, url: str, dest_path: str) -> None:
-        """Download a file (e.g. generated video) to local path."""
-        client = await self._get_client()
-        async with client.stream("GET", url) as resp:
-            resp.raise_for_status()
-            with open(dest_path, "wb") as f:
-                async for chunk in resp.aiter_bytes():
-                    f.write(chunk)
+        """Download a file (e.g. generated video) to local path, retrying on auth failures."""
+        # OSS signed URLs don't need the SophNet auth header — use a plain client
+        last_error = None
+        for attempt in range(3):
+            try:
+                async with httpx.AsyncClient(timeout=60) as dl_client:
+                    async with dl_client.stream("GET", url) as resp:
+                        resp.raise_for_status()
+                        with open(dest_path, "wb") as f:
+                            async for chunk in resp.aiter_bytes():
+                                f.write(chunk)
+                        return
+            except httpx.HTTPStatusError as e:
+                last_error = e
+                if e.response.status_code == 403 and attempt < 2:
+                    await asyncio.sleep(2)  # OSS signed URL may need propagation
+                    continue
+                raise
+        raise last_error  # type: ignore[misc]

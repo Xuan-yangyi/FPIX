@@ -19,7 +19,7 @@ from services.llm_service import (
 )
 from services.sophnet_client import SophNetClient, SophNetError
 from services.video_service import generate_and_download
-from services.image_service import generate_and_download_image, submit_image_edit, poll_image_task
+from services.image_service import generate_and_download_image, submit_image_edit, poll_image_task, _extract_task_id
 from settings import SETTINGS
 
 # In-memory progress queues for SSE (task_id -> asyncio.Queue)
@@ -125,7 +125,7 @@ async def _run_product_set(client: SophNetClient, task_id: str):
             return
         image_paths = json.loads(task.image_paths)
         llm_model = task.llm_model
-        image_model = task.image_model or "qwen-image-plus"
+        image_model = task.image_model or "Qwen-Image"
         params = json.loads(task.params)
         user_requirements = task.user_requirements or ""
 
@@ -206,7 +206,7 @@ async def _run_remove_bg(client: SophNetClient, task_id: str):
             return
         image_paths = json.loads(task.image_paths)
         params = json.loads(task.params)
-        image_model = task.image_model or "qwen-image-edit-2509"
+        image_model = task.image_model or "Qwen-Image"
 
     if not image_paths:
         raise ValueError("No input image provided")
@@ -222,10 +222,7 @@ async def _run_remove_bg(client: SophNetClient, task_id: str):
 
     submit_result = await submit_image_edit(client, image_model, image_paths[0], remove_bg_prompt)
 
-    inner = submit_result.get("result", {})
-    st_id = inner.get("task_id") if isinstance(inner, dict) else None
-    if not st_id:
-        st_id = submit_result.get("task_id") or submit_result.get("taskId")
+    st_id = _extract_task_id(submit_result)
     if not st_id:
         raise SophNetError(f"Cannot extract task_id from response: {submit_result}")
 
@@ -244,10 +241,7 @@ async def _run_remove_bg(client: SophNetClient, task_id: str):
         # Generate white background version
         white_bg_prompt = "Place this product on a pure white background (#FFFFFF). Keep the product exactly as is. Clean e-commerce product photography style."
         submit_result2 = await submit_image_edit(client, image_model, transparent_path, white_bg_prompt)
-        inner2 = submit_result2.get("result", {})
-        st_id2 = inner2.get("task_id") if isinstance(inner2, dict) else None
-        if not st_id2:
-            st_id2 = submit_result2.get("task_id") or submit_result2.get("taskId")
+        st_id2 = _extract_task_id(submit_result2)
         if st_id2:
             image_url2 = await poll_image_task(client, st_id2)
             white_path = os.path.join(task_dir, "white_bg.png")
@@ -272,7 +266,7 @@ async def _run_model(client: SophNetClient, task_id: str):
             return
         image_paths = json.loads(task.image_paths)
         llm_model = task.llm_model
-        image_model = task.image_model or "qwen-image-edit-2509"
+        image_model = task.image_model or "Qwen-Image"
         params = json.loads(task.params)
         user_requirements = task.user_requirements or ""
 
@@ -309,10 +303,7 @@ async def _run_model(client: SophNetClient, task_id: str):
             prompt += f" Variation {i+1}: slightly different angle and lighting."
 
         submit_result = await submit_image_edit(client, image_model, image_paths[0], prompt)
-        inner = submit_result.get("result", {})
-        st_id = inner.get("task_id") if isinstance(inner, dict) else None
-        if not st_id:
-            st_id = submit_result.get("task_id") or submit_result.get("taskId")
+        st_id = _extract_task_id(submit_result)
         if not st_id:
             raise SophNetError(f"Cannot extract task_id: {submit_result}")
 
@@ -346,7 +337,7 @@ async def _run_edit(client: SophNetClient, task_id: str):
             return
         image_paths = json.loads(task.image_paths)
         llm_model = task.llm_model
-        image_model = task.image_model or "qwen-image-edit-2509"
+        image_model = task.image_model or "Qwen-Image"
         params = json.loads(task.params)
         user_requirements = task.user_requirements or ""
 
@@ -370,10 +361,7 @@ async def _run_edit(client: SophNetClient, task_id: str):
     prompt = edit_parsed.get("en_prompt", instruction)
     submit_result = await submit_image_edit(client, image_model, image_paths[0], prompt)
 
-    inner = submit_result.get("result", {})
-    st_id = inner.get("task_id") if isinstance(inner, dict) else None
-    if not st_id:
-        st_id = submit_result.get("task_id") or submit_result.get("taskId")
+    st_id = _extract_task_id(submit_result)
     if not st_id:
         raise SophNetError(f"Cannot extract task_id: {submit_result}")
 

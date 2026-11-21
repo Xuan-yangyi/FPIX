@@ -6,7 +6,7 @@ from dataclasses import dataclass, field
 class Settings:
     api_key: str = field(default_factory=lambda: os.getenv("SOPHNET_API_KEY", ""))
     preferred_llm_model: str = field(
-        default_factory=lambda: os.getenv("PREFERRED_LLM_MODEL", "DeepSeek-V4-Flash-Vision-Exp")
+        default_factory=lambda: os.getenv("PREFERRED_LLM_MODEL", "gpt-4o")
     )
     preferred_video_model: str = field(
         default_factory=lambda: os.getenv("PREFERRED_VIDEO_MODEL", "happyhorse-1.1-i2v")
@@ -17,11 +17,9 @@ class Settings:
     video_gen_url: str = "https://www.sophnet.com/api/open-apis/projects/easyllms/videogenerator/generate"
     video_query_url: str = "https://www.sophnet.com/api/open-apis/projects/easyllms/videogenerator/task/{task_id}"
 
-    # SophNet image generation endpoints
-    image_gen_url: str = "https://www.sophnet.com/api/open-apis/projects/easyllms/imagegenerator/generate"
+    # SophNet image generation endpoints (both gen and edit use the same /task endpoint)
+    image_gen_url: str = "https://www.sophnet.com/api/open-apis/projects/easyllms/imagegenerator/task"
     image_query_url: str = "https://www.sophnet.com/api/open-apis/projects/easyllms/imagegenerator/task/{task_id}"
-    image_edit_url: str = "https://www.sophnet.com/api/open-apis/projects/easyllms/imageeditor/edit"
-    image_edit_query_url: str = "https://www.sophnet.com/api/open-apis/projects/easyllms/imageeditor/task/{task_id}"
 
     # Polling
     image_poll_interval_sec: int = 3

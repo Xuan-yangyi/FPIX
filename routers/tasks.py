@@ -57,7 +57,7 @@ async def create_task_json(request: Request, db: AsyncSession = Depends(get_db))
     user_requirements = body.get("user_requirements", "")
     llm_model = body.get("llm_model", SETTINGS.preferred_llm_model)
     video_model = body.get("video_model", SETTINGS.preferred_video_model)
-    image_model = body.get("image_model", "qwen-image-plus")
+    image_model = body.get("image_model", "Qwen-Image")
     specs = body.get("specs", {})
 
     # Validate images exist

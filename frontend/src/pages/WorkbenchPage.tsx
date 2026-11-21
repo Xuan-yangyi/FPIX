@@ -52,13 +52,13 @@ export function WorkbenchPage() {
     }
 
     if (workflowType === 'video') {
-      taskData.llm_model = params.llm_model || 'DeepSeek-V4-Flash-Vision-Exp'
+      taskData.llm_model = params.llm_model || 'gpt-4o'
       taskData.video_model = params.video_model || 'happyhorse-1.1-i2v'
       taskData.user_requirements = params.requirements || ''
       taskData.specs = {}
     } else {
       taskData.user_requirements = params.requirements || params.edit_instruction || params.replacement_desc || ''
-      taskData.image_model = 'qwen-image-plus'
+      taskData.image_model = 'Qwen-Image'
     }
 
     const id = await create(taskData)
