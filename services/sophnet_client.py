@@ -86,7 +86,7 @@ class SophNetClient:
         """Submit an image generation task to SophNet.
 
         Uses the unified imagegenerator/task endpoint.
-        - model: 'Qwen-Image' for generation, 'Qwen-Image-Edit-2509' for editing
+        - model: 'Qwen-Image-Edit-2509' for all image tasks (edit + reference)
         - prompt: text prompt for generation/editing
         - images: list of image URLs or data URIs (optional, for reference/edit)
         """

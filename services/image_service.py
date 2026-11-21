@@ -26,9 +26,10 @@ async def submit_image_generation(
     prompt_text: str,
     parameters: dict | None = None,
 ) -> dict:
-    """Submit an image generation task with optional reference images."""
+    """Submit an image generation task with optional reference images.
+    Only adds default size for Qwen-Image (generation model); edit models reject it."""
     images = [_image_to_data_url(p) for p in image_paths] if image_paths else None
-    if parameters is None:
+    if parameters is None and "Edit" not in model:
         parameters = {"size": "1328*1328"}
     return await client.generate_image(model, prompt_text, images, parameters)
 

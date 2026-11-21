@@ -125,7 +125,7 @@ async def _run_product_set(client: SophNetClient, task_id: str):
             return
         image_paths = json.loads(task.image_paths)
         llm_model = task.llm_model
-        image_model = task.image_model or "Qwen-Image"
+        image_model = task.image_model or "Qwen-Image-Edit-2509"
         params = json.loads(task.params)
         user_requirements = task.user_requirements or ""
 
