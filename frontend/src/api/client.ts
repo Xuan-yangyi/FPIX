@@ -16,7 +16,7 @@ export const api = {
   upload: async (files: FileList): Promise<{ file_paths: string[]; batch_id: string }> => {
     const form = new FormData()
     Array.from(files).forEach(f => form.append('images', f))
-    const res = await fetch(`${BASE}/upload`, { method: 'POST', body: form })
+    const res = await fetch(`${BASE}/tasks/upload`, { method: 'POST', body: form })
     if (!res.ok) throw new Error(await res.text())
     return res.json()
   },
