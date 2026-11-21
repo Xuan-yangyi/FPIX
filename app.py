@@ -20,6 +20,9 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="电商AI内容生产工具", lifespan=lifespan)
 
+# Base directory for resolving relative paths
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
 # CORS for local dev
 app.add_middleware(
     CORSMiddleware,
@@ -30,16 +33,16 @@ app.add_middleware(
 )
 
 # Static files
-app.mount("/static", StaticFiles(directory="static"), name="static")
-app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
-app.mount("/outputs", StaticFiles(directory="outputs"), name="outputs")
+app.mount("/static", StaticFiles(directory=os.path.join(BASE_DIR, "static")), name="static")
+app.mount("/uploads", StaticFiles(directory=os.path.join(BASE_DIR, "uploads")), name="uploads")
+app.mount("/outputs", StaticFiles(directory=os.path.join(BASE_DIR, "outputs")), name="outputs")
 
 # API routers — always active
 app.include_router(tasks_router)
 app.include_router(config_router)
 
 # Serve React SPA from frontend/dist
-frontend_dist = os.path.join(os.path.dirname(__file__), "frontend", "dist")
+frontend_dist = os.path.join(BASE_DIR, "frontend", "dist")
 if os.path.exists(frontend_dist):
     # SPA mode: serve React frontend
     app.mount("/assets", StaticFiles(directory=os.path.join(frontend_dist, "assets")), name="spa_assets")
