@@ -258,7 +258,7 @@ async def _run_remove_bg(client: SophNetClient, task_id: str):
     await _broadcast_progress(task_id, "removing_bg", message="正在去除背景...")
 
     # Background removal prompt
-    remove_bg_prompt = "Remove the background from this product image. Make the background completely transparent while keeping every detail of the product intact. The product edges should be sharp and clean. Output a transparent PNG."
+    remove_bg_prompt = "去除图片背景，产品主体保持不变，输出透明PNG"
 
     submit_result = await submit_image_edit(client, image_model, image_paths[0], remove_bg_prompt)
 
