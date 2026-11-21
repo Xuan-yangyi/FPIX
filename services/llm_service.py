@@ -76,13 +76,13 @@ IMAGE_PROMPTS_TEMPLATE = """你是一个顶级的电商视觉设计师和AI图�
 
 {{
   "white_bg": {{
-    "cn_prompt": "白底图编辑提示词（只需描述去掉背景换成纯白、保持产品不变）",
+    "cn_prompt": "白底图编辑提示词（只需描述去掉背景换成纯白、产品不变）",
     "en_prompt": "English edit prompt for white background (only describe background change, product stays identical)"
   }},
   "scenes": [
     {{
       "type": "场景类型标签",
-      "cn_prompt": "场景编辑提示词（只描述背景环境、不修改产品）",
+      "cn_prompt": "场景编辑提示词（只描述新背景和环境，产品不变）",
       "en_prompt": "English edit prompt (describe ONLY the new background and environment, not the product)"
     }}
   ],
@@ -107,9 +107,10 @@ IMAGE_PROMPTS_TEMPLATE = """你是一个顶级的电商视觉设计师和AI图�
 }}
 
 CRITICAL RULES:
-1. Every en_prompt must begin with: "Replace the background with [scene description]. Keep the product 100% identical to the reference image."
-2. Every en_prompt must end with: "Do NOT modify, redesign, or alter the product. Only change the background and environment."
-3. Do NOT describe the product itself — the product is already in the reference image. ONLY describe the new background/scene."""
+1. cn_prompt（中文）必须以"只更换背景为"开头，以"产品主体保持100%不变"结尾。
+2. en_prompt must begin with: "Replace the background with [scene description]. Keep the product 100% identical to the reference image."
+3. en_prompt must end with: "Do NOT modify, redesign, or alter the product. Only change the background and environment."
+4. 绝对不要描述产品本身——产品已经在参考图中。只描述新的背景/场景/环境。"""
 
 
 async def generate_image_prompts(

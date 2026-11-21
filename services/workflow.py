@@ -145,52 +145,40 @@ async def _run_product_set(client: SophNetClient, task_id: str):
     prompts = await generate_image_prompts(client, llm_model, analysis, params)
 
     # Build product identity anchor from analysis to preserve product appearance
-    contour = analysis.get("product_contour", "")
-    features = ", ".join(analysis.get("key_features", []))
-    colors = analysis.get("color_scheme", {})
-    main_color = colors.get("main_color", "") if isinstance(colors, dict) else ""
-    product_anchor = (
-        f"Replace the background while keeping the product exactly identical. "
-        f"Product details: {contour}. Key features: {features}. "
-        f"Primary color: {main_color}. "
-        f"CRITICAL: This is an image EDIT — only modify the background, scenery, and lighting. "
-        f"The product itself must remain 100% unchanged from the reference image. "
-    )
-    negative_suffix = (
-        " IMPORTANT: Do NOT change, redesign, reshape, recolor, or alter the product in any way. "
-        "The product design, shape, color, and fabric must be identical to the reference. "
-        "Only modify what surrounds the product."
-    )
+    # Use Chinese prompts for Qwen-Image-Edit-2509 — it follows Chinese instructions
+    # with much higher fidelity than English prompts.
+    product_anchor = "只更换背景。产品主体保持100%不变。"
+    negative_suffix = ""
 
     def _wrap_prompt(base_prompt: str) -> str:
-        """Wrap a prompt with product identity prefix and negative suffix."""
-        return product_anchor + base_prompt + negative_suffix
+        """Wrap a prompt with product identity prefix."""
+        return product_anchor + base_prompt
 
     # Stage 3: Batch image generation
     generation_tasks = []
 
     # White background — use remove_bg approach for perfect product preservation
-    if prompts.get("white_bg", {}).get("en_prompt"):
-        generation_tasks.append(("white_bg", prompts["white_bg"]["en_prompt"], True))
+    if prompts.get("white_bg", {}).get("cn_prompt"):
+        generation_tasks.append(("white_bg", prompts["white_bg"]["cn_prompt"], True))
 
     # Scenes
     for scene in prompts.get("scenes", []):
-        if scene.get("en_prompt"):
-            generation_tasks.append(("scene", scene["en_prompt"], False))
+        if scene.get("cn_prompt"):
+            generation_tasks.append(("scene", scene["cn_prompt"], False))
 
     # Selling points
     for sp in prompts.get("selling_points", []):
-        if sp.get("en_prompt"):
-            generation_tasks.append(("selling_point", sp["en_prompt"], False))
+        if sp.get("cn_prompt"):
+            generation_tasks.append(("selling_point", sp["cn_prompt"], False))
 
     # Details
     for d in prompts.get("details", []):
-        if d.get("en_prompt"):
-            generation_tasks.append(("detail", d["en_prompt"], False))
+        if d.get("cn_prompt"):
+            generation_tasks.append(("detail", d["cn_prompt"], False))
 
     # Size chart
-    if prompts.get("size_chart", {}).get("en_prompt"):
-        generation_tasks.append(("size_chart", prompts["size_chart"]["en_prompt"], False))
+    if prompts.get("size_chart", {}).get("cn_prompt"):
+        generation_tasks.append(("size_chart", prompts["size_chart"]["cn_prompt"], False))
 
     total_images = len(generation_tasks)
     await _broadcast_progress(task_id, "generating", current=0, total=total_images,
@@ -204,8 +192,8 @@ async def _run_product_set(client: SophNetClient, task_id: str):
         if is_white_bg:
             # Use remove_bg approach: pure white background with product preserved
             white_bg_prompt = _wrap_prompt(
-                "Replace the background with pure white (#FFFFFF). Keep the product exactly as is. "
-                "Clean e-commerce white background product photo, studio lighting."
+                "将背景更换为纯白色（#FFFFFF）。产品保持原样不变。"
+                "电商白底图风格，均匀柔和的摄影棚光线。"
             )
             submit_result = await submit_image_edit(client, image_model, image_paths[0], white_bg_prompt)
             st_id = _extract_task_id(submit_result)
@@ -279,7 +267,7 @@ async def _run_remove_bg(client: SophNetClient, task_id: str):
     if output_format in ("white_bg", "both"):
         await _broadcast_progress(task_id, "removing_bg", message="正在生成白底图...")
         # Generate white background version
-        white_bg_prompt = "Place this product on a pure white background (#FFFFFF). Keep the product exactly as is. Clean e-commerce product photography style."
+        white_bg_prompt = "将背景更换为纯白色（#FFFFFF）。产品保持原样不变。电商白底图风格，均匀柔和的摄影棚光线。"
         submit_result2 = await submit_image_edit(client, image_model, transparent_path, white_bg_prompt)
         st_id2 = _extract_task_id(submit_result2)
         if st_id2:
