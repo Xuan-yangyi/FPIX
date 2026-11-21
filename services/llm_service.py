@@ -27,30 +27,144 @@ def _extract_json(text: str) -> dict | list:
     raise ValueError(f"Could not extract JSON from response: {text[:200]}...")
 
 
-ANALYZE_IMAGE_PROMPT = """你是一个电商产品分析专家。请分析以下产品图片，严格输出 JSON（不要包含其他内容）：
+ANALYZE_PRODUCT_PROMPT = """你是一个电商产品分析专家。请仔细分析这张产品图片，输出详细的结构化分析。
+
+你需要从以下维度进行分析，并严格输出 JSON（不要包含 markdown 标记或其他内容）：
 
 {
-  "category": "产品品类",
-  "material": "材质",
-  "style": "风格",
-  "color_scheme": "配色方案",
-  "target_audience": "目标人群",
-  "key_features": ["卖点1", "卖点2", "卖点3"],
-  "visual_highlights": "视觉亮点描述",
-  "suggested_shooting_style": "建议拍摄风格"
+  "category": "产品品类（中英文都写）",
+  "material": "材质和表面处理细节",
+  "style": "设计风格和视觉调性",
+  "color_scheme": "详细配色方案（主色、辅色、点缀色）",
+  "texture_detail": "材质纹理细节描述",
+  "lighting": "当前图片的光线条件",
+  "product_contour": "产品形状和轮廓描述",
+  "key_features": ["卖点1", "卖点2", "卖点3", "卖点4", "卖点5"],
+  "target_audience": "目标人群画像",
+  "keep_intact": ["必须保留不变的元素1", "元素2", "元素3"],
+  "suggested_scenes": ["适合的场景1", "场景2", "场景3"],
+  "visual_highlights": "视觉亮点一段话描述"
 }"""
 
 
-async def analyze_image(client: SophNetClient, model: str, image_base64: str) -> dict:
-    """Analyze product image using a vision-capable model."""
+async def analyze_product_image(client: SophNetClient, model: str, image_base64: str) -> dict:
+    """Analyze product image using a vision-capable model. Returns rich structured analysis."""
     messages = [{
         "role": "user",
         "content": [
             {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{image_base64}"}},
-            {"type": "text", "text": ANALYZE_IMAGE_PROMPT},
+            {"type": "text", "text": ANALYZE_PRODUCT_PROMPT},
         ],
     }]
     result = await client.chat_completion(model, messages, temperature=0.7)
+    return _extract_json(result["content"])
+
+
+IMAGE_PROMPTS_TEMPLATE = """你是一个顶级的电商视觉设计师和AI图像生成提示词工程师。
+
+根据以下产品分析结果和用户需求，为不同类型的电商图片生成精准的 AI 图像提示词。
+
+产品分析：{analysis}
+目标平台：{platform}
+图片比例：{ratio}
+输出语言：{language}
+{requirements_block}
+
+请严格输出 JSON（不要包含 markdown 标记）：
+
+{{
+  "white_bg": {{
+    "cn_prompt": "纯白背景产品精修图的中文提示词（包含产品细节、构图、光线要求，确保产品主体完全保留原样）",
+    "en_prompt": "English prompt for clean white background product image"
+  }},
+  "scenes": [
+    {{
+      "type": "场景类型标签",
+      "cn_prompt": "该场景的中文提示词（包含场景、氛围、产品摆放、光线，确保产品主体完全保留原样）",
+      "en_prompt": "English prompt for this scene"
+    }}
+  ],
+  "selling_points": [
+    {{
+      "type": "卖点标签",
+      "cn_prompt": "卖点展示图中文提示词（有文字标注空间，产品细节突出）",
+      "en_prompt": "English prompt"
+    }}
+  ],
+  "details": [
+    {{
+      "type": "细节类型",
+      "cn_prompt": "细节特写中文提示词",
+      "en_prompt": "English prompt"
+    }}
+  ],
+  "size_chart": {{
+    "cn_prompt": "尺寸/结构展示图中文提示词（如果产品适合做尺寸图；如果不适合则为空字符串）",
+    "en_prompt": "English prompt"
+  }}
+}}
+
+要求：
+- 所有 prompt 必须以 "保持产品主体完全不变" 或 "Keep the product exactly as is" 开头
+- 中文 prompt 要详细、具体、可用于图生图模型
+- 场景图要多样化（不同使用场景、不同角度、不同氛围）
+- 卖点图要预留标注空间
+- 每个 prompt 中必须包含产品关键识别特征（从 product_contour 和 key_features 提取），确保生成图像中的产品与原图一致"""
+
+
+async def generate_image_prompts(
+    client: SophNetClient,
+    model: str,
+    analysis: dict,
+    params: dict,
+) -> dict:
+    """Generate image generation prompts for all listing image types."""
+    platform = params.get("platform", "通用电商平台")
+    ratio = params.get("ratio", "1:1")
+    language = params.get("language", "zh")
+    requirements = params.get("requirements", "")
+    req_block = f"\n用户补充要求：{requirements}" if requirements.strip() else ""
+
+    prompt = IMAGE_PROMPTS_TEMPLATE.format(
+        analysis=json.dumps(analysis, ensure_ascii=False),
+        platform=platform,
+        ratio=ratio,
+        language=language,
+        requirements_block=req_block,
+    )
+    messages = [{"role": "user", "content": prompt}]
+    result = await client.chat_completion(model, messages, temperature=0.8)
+    return _extract_json(result["content"])
+
+
+EDIT_PARSE_PROMPT = """你是一个 AI 图片编辑指令解析器。
+
+用户原始指令：{instruction}
+图片描述：{image_description}
+
+请将用户的自然语言编辑请求解析为结构化的编辑参数，严格输出 JSON：
+
+{{
+  "action": "replace_background|replace_object|remove_object|add_object|adjust_style|other",
+  "target": "要修改的目标区域/对象描述",
+  "replacement": "替换为的新内容描述",
+  "keep_intact": ["必须保持不变的元素"],
+  "style_notes": "风格和氛围要求",
+  "cn_prompt": "用于 AI 图片编辑的中文提示词（详细、具体）",
+  "en_prompt": "English prompt for AI image editing"
+}}"""
+
+
+async def parse_edit_instruction(
+    client: SophNetClient,
+    model: str,
+    instruction: str,
+    image_description: str = "",
+) -> dict:
+    """Parse a natural language edit instruction into structured parameters."""
+    prompt = EDIT_PARSE_PROMPT.format(instruction=instruction, image_description=image_description)
+    messages = [{"role": "user", "content": prompt}]
+    result = await client.chat_completion(model, messages, temperature=0.3)
     return _extract_json(result["content"])
 
 
@@ -118,3 +232,7 @@ async def generate_storyboard(
     messages = [{"role": "user", "content": prompt}]
     result = await client.chat_completion(model, messages, temperature=0.9)
     return _extract_json(result["content"])
+
+
+# Backward compatibility alias for video workflow
+analyze_image = analyze_product_image
