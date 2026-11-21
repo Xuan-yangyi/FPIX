@@ -144,46 +144,86 @@ async def _run_product_set(client: SophNetClient, task_id: str):
     params["requirements"] = user_requirements
     prompts = await generate_image_prompts(client, llm_model, analysis, params)
 
+    # Build product identity anchor from analysis to preserve product appearance
+    contour = analysis.get("product_contour", "")
+    features = ", ".join(analysis.get("key_features", []))
+    colors = analysis.get("color_scheme", {})
+    main_color = colors.get("main_color", "") if isinstance(colors, dict) else ""
+    product_anchor = (
+        f"Replace the background while keeping the product exactly identical. "
+        f"Product details: {contour}. Key features: {features}. "
+        f"Primary color: {main_color}. "
+        f"CRITICAL: This is an image EDIT — only modify the background, scenery, and lighting. "
+        f"The product itself must remain 100% unchanged from the reference image. "
+    )
+    negative_suffix = (
+        " IMPORTANT: Do NOT change, redesign, reshape, recolor, or alter the product in any way. "
+        "The product design, shape, color, and fabric must be identical to the reference. "
+        "Only modify what surrounds the product."
+    )
+
+    def _wrap_prompt(base_prompt: str) -> str:
+        """Wrap a prompt with product identity prefix and negative suffix."""
+        return product_anchor + base_prompt + negative_suffix
+
     # Stage 3: Batch image generation
-    # Collect all generation tasks: white_bg + scenes + selling_points + details + size_chart
     generation_tasks = []
 
-    # White background
+    # White background — use remove_bg approach for perfect product preservation
     if prompts.get("white_bg", {}).get("en_prompt"):
-        generation_tasks.append(("white_bg", prompts["white_bg"]["en_prompt"]))
+        generation_tasks.append(("white_bg", prompts["white_bg"]["en_prompt"], True))
 
     # Scenes
     for scene in prompts.get("scenes", []):
         if scene.get("en_prompt"):
-            generation_tasks.append(("scene", scene["en_prompt"]))
+            generation_tasks.append(("scene", scene["en_prompt"], False))
 
     # Selling points
     for sp in prompts.get("selling_points", []):
         if sp.get("en_prompt"):
-            generation_tasks.append(("selling_point", sp["en_prompt"]))
+            generation_tasks.append(("selling_point", sp["en_prompt"], False))
 
     # Details
     for d in prompts.get("details", []):
         if d.get("en_prompt"):
-            generation_tasks.append(("detail", d["en_prompt"]))
+            generation_tasks.append(("detail", d["en_prompt"], False))
 
     # Size chart
     if prompts.get("size_chart", {}).get("en_prompt"):
-        generation_tasks.append(("size_chart", prompts["size_chart"]["en_prompt"]))
+        generation_tasks.append(("size_chart", prompts["size_chart"]["en_prompt"], False))
 
     total_images = len(generation_tasks)
     await _broadcast_progress(task_id, "generating", current=0, total=total_images,
                               message=f"正在生成 {total_images} 张图片...")
 
     result_images = []
-    for idx, (img_type, prompt) in enumerate(generation_tasks):
+    for idx, (img_type, prompt, is_white_bg) in enumerate(generation_tasks):
         await _broadcast_progress(task_id, "generating", current=idx + 1, total=total_images,
                                   image_type=img_type, message=f"正在生成: {img_type} ({idx+1}/{total_images})")
 
-        local_path = await generate_and_download_image(
-            client, image_model, image_paths, prompt,
-            task_id=task_id, output_subdir=f"{img_type}s", image_index=idx,
-        )
+        if is_white_bg:
+            # Use remove_bg approach: pure white background with product preserved
+            white_bg_prompt = _wrap_prompt(
+                "Replace the background with pure white (#FFFFFF). Keep the product exactly as is. "
+                "Clean e-commerce white background product photo, studio lighting."
+            )
+            submit_result = await submit_image_edit(client, image_model, image_paths[0], white_bg_prompt)
+            st_id = _extract_task_id(submit_result)
+            if not st_id:
+                raise SophNetError(f"Cannot extract task_id for white_bg: {submit_result}")
+            image_url = await poll_image_task(client, st_id)
+
+            task_dir = os.path.join(SETTINGS.output_dir, task_id, f"{img_type}s")
+            os.makedirs(task_dir, exist_ok=True)
+            local_path = os.path.join(task_dir, f"image_{idx:02d}.png")
+            await client.download_file(image_url, local_path)
+        else:
+            wrapped_prompt = _wrap_prompt(prompt)
+            local_path = await generate_and_download_image(
+                client, image_model, image_paths, wrapped_prompt,
+                task_id=task_id, output_subdir=f"{img_type}s", image_index=idx,
+            )
+
         result_images.append({"type": img_type, "path": local_path})
 
         # Send preview URL for immediate display

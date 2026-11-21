@@ -60,9 +60,11 @@ async def analyze_product_image(client: SophNetClient, model: str, image_base64:
     return _extract_json(result["content"])
 
 
-IMAGE_PROMPTS_TEMPLATE = """你是一个顶级的电商视觉设计师和AI图像生成提示词工程师。
+IMAGE_PROMPTS_TEMPLATE = """你是一个顶级的电商视觉设计师和AI图像编辑提示词工程师。
 
-根据以下产品分析结果和用户需求，为不同类型的电商图片生成精准的 AI 图像提示词。
+根据以下产品分析结果和用户需求，为不同类型的电商图片生成精准的 AI 图像编辑提示词。
+
+**重要：这是一个图像编辑任务，不是从零生成。产品主体必须100%保留原样，只修改背景、场景和光线。**
 
 产品分析：{analysis}
 目标平台：{platform}
@@ -74,42 +76,40 @@ IMAGE_PROMPTS_TEMPLATE = """你是一个顶级的电商视觉设计师和AI图�
 
 {{
   "white_bg": {{
-    "cn_prompt": "纯白背景产品精修图的中文提示词（包含产品细节、构图、光线要求，确保产品主体完全保留原样）",
-    "en_prompt": "English prompt for clean white background product image"
+    "cn_prompt": "白底图编辑提示词（只需描述去掉背景换成纯白、保持产品不变）",
+    "en_prompt": "English edit prompt for white background (only describe background change, product stays identical)"
   }},
   "scenes": [
     {{
       "type": "场景类型标签",
-      "cn_prompt": "该场景的中文提示词（包含场景、氛围、产品摆放、光线，确保产品主体完全保留原样）",
-      "en_prompt": "English prompt for this scene"
+      "cn_prompt": "场景编辑提示词（只描述背景环境、不修改产品）",
+      "en_prompt": "English edit prompt (describe ONLY the new background and environment, not the product)"
     }}
   ],
   "selling_points": [
     {{
       "type": "卖点标签",
-      "cn_prompt": "卖点展示图中文提示词（有文字标注空间，产品细节突出）",
-      "en_prompt": "English prompt"
+      "cn_prompt": "卖点展示图编辑提示词（只描述标注空间和背景，产品不变）",
+      "en_prompt": "English edit prompt"
     }}
   ],
   "details": [
     {{
       "type": "细节类型",
-      "cn_prompt": "细节特写中文提示词",
-      "en_prompt": "English prompt"
+      "cn_prompt": "细节特写编辑提示词（只描述裁剪/视角变化，产品不变）",
+      "en_prompt": "English edit prompt"
     }}
   ],
   "size_chart": {{
-    "cn_prompt": "尺寸/结构展示图中文提示词（如果产品适合做尺寸图；如果不适合则为空字符串）",
-    "en_prompt": "English prompt"
+    "cn_prompt": "尺寸展示图编辑提示词（不适合则留空）",
+    "en_prompt": "English edit prompt (leave empty if not applicable)"
   }}
 }}
 
-要求：
-- 所有 prompt 必须以 "保持产品主体完全不变" 或 "Keep the product exactly as is" 开头
-- 中文 prompt 要详细、具体、可用于图生图模型
-- 场景图要多样化（不同使用场景、不同角度、不同氛围）
-- 卖点图要预留标注空间
-- 每个 prompt 中必须包含产品关键识别特征（从 product_contour 和 key_features 提取），确保生成图像中的产品与原图一致"""
+CRITICAL RULES:
+1. Every en_prompt must begin with: "Replace the background with [scene description]. Keep the product 100% identical to the reference image."
+2. Every en_prompt must end with: "Do NOT modify, redesign, or alter the product. Only change the background and environment."
+3. Do NOT describe the product itself — the product is already in the reference image. ONLY describe the new background/scene."""
 
 
 async def generate_image_prompts(
