@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect } from 'react'
 import { api } from '../api/client'
 import type { ProgressEvent, ResultImage } from '../types'
 
@@ -25,7 +25,7 @@ export function useTaskProgress(taskId: string | null) {
       if (data.total !== undefined) setTotal(data.total)
 
       if (data.preview_url) {
-        setPreviewUrls(prev => [...prev, data.preview_url])
+        setPreviewUrls(prev => [...prev, data.preview_url!])
       }
 
       if (data.result_images) {

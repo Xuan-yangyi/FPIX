@@ -7,7 +7,7 @@ import { ResultPanel } from '../components/workbench/ResultPanel'
 import { useTaskCreate } from '../hooks/useTaskCreate'
 import { useTaskProgress } from '../hooks/useTaskProgress'
 import { api } from '../api/client'
-import { TOOLS, type WorkflowType } from '../types'
+import type { WorkflowType } from '../types'
 
 const toolTitles: Record<string, string> = {
   product_set: '商品套图',
@@ -20,7 +20,6 @@ const toolTitles: Record<string, string> = {
 export function WorkbenchPage() {
   const { type } = useParams<{ type: string }>()
   const workflowType = (type || 'product_set') as WorkflowType
-  const toolInfo = TOOLS.find(t => t.id === workflowType)
 
   const [files, setFiles] = useState<File[]>([])
   const [params, setParams] = useState<Record<string, string>>({})
