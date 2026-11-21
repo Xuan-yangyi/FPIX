@@ -40,10 +40,8 @@ async def submit_image_edit(
     prompt_text: str,
     parameters: dict | None = None,
 ) -> dict:
-    """Submit an image editing task."""
+    """Submit an image editing task. Qwen-Image-Edit-2509 does NOT accept size parameters."""
     images = [_image_to_data_url(image_path)] if image_path else None
-    if parameters is None:
-        parameters = {"size": "1328*1328"}
     return await client.generate_image(model, prompt_text, images, parameters)
 
 

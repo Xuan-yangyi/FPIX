@@ -58,7 +58,7 @@ export function WorkbenchPage() {
       taskData.specs = {}
     } else {
       taskData.user_requirements = params.requirements || params.edit_instruction || params.replacement_desc || ''
-      taskData.image_model = 'Qwen-Image'
+      // image_model uses backend default per workflow: Qwen-Image for generation, Qwen-Image-Edit-2509 for editing
     }
 
     const id = await create(taskData)
