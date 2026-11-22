@@ -287,35 +287,38 @@ async def _run_remove_bg(client: SophNetClient, task_id: str):
 
 
 async def _run_model(client: SophNetClient, task_id: str):
-    """Model replacement workflow: analyze -> targeted edit -> multiple variants."""
+    """Model workflow: put product clothing onto model photo using dual-image edit.
+
+    Dual-image mode: main image = model photo, reference image = product clothing.
+    Qwen-Image-Edit-2509 transfers the clothing from the reference image onto the model,
+    preserving the model's pose, hairstyle, and background.
+    """
     async with async_session() as db:
         task = await db.get(Task, task_id)
         if not task:
             return
         image_paths = json.loads(task.image_paths)
-        llm_model = task.llm_model
         image_model = task.image_model or "Qwen-Image-Edit-2509"
         params = json.loads(task.params)
         user_requirements = task.user_requirements or ""
 
-    if not image_paths:
-        raise ValueError("No input image provided")
+    if len(image_paths) < 2:
+        raise ValueError("AI模特需要上传两张图片：第1张=模特照（主图），第2张=衣服商品图（参考图）")
 
-    # Stage 1: Analyze current image
-    await _broadcast_progress(task_id, "analyzing", message="正在分析图片...")
-    image_b64 = _image_to_base64(image_paths[0])
-    analysis = await analyze_product_image(client, llm_model, image_b64)
+    model_photo = image_paths[0]   # 主图：模特照
+    product_img = image_paths[1]   # 参考图：衣服商品图
+    num_variants = int(params.get("num_variants", 3))
+    extra_req = params.get("replacement_desc", user_requirements)
 
-    # Stage 2: Parse replacement instruction
-    replacement_desc = params.get("replacement_desc", user_requirements)
-    if not replacement_desc:
-        replacement_desc = "Replace the background with a modern, clean e-commerce scene"
-    num_variants = params.get("num_variants", 3)
+    # Build prompt
+    prompt = (
+        "将参考图中的衣服穿到主图模特身上。"
+        "保持模特的姿态、发型、背景完全不变。"
+        "保持衣服的花纹、颜色、版型细节完全一致。"
+    )
+    if extra_req and extra_req.strip():
+        prompt += f" 补充要求：{extra_req}"
 
-    edit_parsed = await parse_edit_instruction(client, llm_model, replacement_desc,
-                                                json.dumps(analysis, ensure_ascii=False))
-
-    # Stage 3: Generate multiple variants
     result_images = []
     total = num_variants
     await _broadcast_progress(task_id, "generating", current=0, total=total,
@@ -325,12 +328,14 @@ async def _run_model(client: SophNetClient, task_id: str):
         await _broadcast_progress(task_id, "generating", current=i + 1, total=total,
                                   message=f"正在生成变体 {i+1}/{num_variants}")
 
-        prompt = edit_parsed.get("en_prompt", replacement_desc)
-        # Add slight variation
-        if i > 0:
-            prompt += f" Variation {i+1}: slightly different angle and lighting."
+        variant_prompt = prompt
+        if num_variants > 1 and i > 0:
+            variant_prompt += f" 变体{i+1}：稍微调整衣服在模特身上的贴合度和自然光影。"
 
-        submit_result = await submit_image_edit(client, image_model, image_paths[0], prompt)
+        submit_result = await submit_image_edit(
+            client, image_model, model_photo, variant_prompt,
+            reference_paths=[product_img],
+        )
         st_id = _extract_task_id(submit_result)
         if not st_id:
             raise SophNetError(f"Cannot extract task_id: {submit_result}")

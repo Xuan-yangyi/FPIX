@@ -75,11 +75,14 @@ export function WorkflowConfig({ type, params, onParamChange }: Props) {
     if (type === 'model') {
       return (
         <div className="space-y-4">
+          <div className="rounded-lg bg-accent/5 border border-accent/10 px-3 py-2 text-xs text-accent/80">
+            双图模式：第1张上传模特照，第2张上传衣服商品图。AI 将把衣服穿到模特身上。
+          </div>
           <div>
-            <label className={labelClass}>替换描述</label>
-            <textarea className={inputClass} rows={3} value={params.replacement_desc || ''}
+            <label className={labelClass}>补充要求（选填）</label>
+            <textarea className={inputClass} rows={2} value={params.replacement_desc || ''}
                       onChange={e => onParamChange('replacement_desc', e.target.value)}
-                      placeholder="例如：将背景替换为海边沙滩场景，模特换为欧美风格..." />
+                      placeholder="例如：让衣服自然下垂，贴合模特身形..." />
           </div>
           <div>
             <label className={labelClass}>生成数量</label>

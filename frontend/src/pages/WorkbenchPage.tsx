@@ -38,6 +38,10 @@ export function WorkbenchPage() {
       alert('请先上传图片')
       return
     }
+    if (workflowType === 'model' && files.length < 2) {
+      alert('AI模特需要上传2张图片：第1张模特照 + 第2张衣服商品图')
+      return
+    }
 
     const uploadResult = await api.upload(files as unknown as FileList)
     if (!uploadResult.file_paths?.length) {

@@ -40,9 +40,16 @@ async def submit_image_edit(
     image_path: str,
     prompt_text: str,
     parameters: dict | None = None,
+    reference_paths: list[str] | None = None,
 ) -> dict:
-    """Submit an image editing task. Qwen-Image-Edit-2509 does NOT accept size parameters."""
-    images = [_image_to_data_url(image_path)] if image_path else None
+    """Submit an image editing task. Qwen-Image-Edit-2509 does NOT accept size parameters.
+
+    - image_path: main image (e.g., model photo)
+    - reference_paths: additional reference images (e.g., product clothing image)
+    """
+    images = [_image_to_data_url(image_path)]
+    if reference_paths:
+        images.extend([_image_to_data_url(p) for p in reference_paths])
     return await client.generate_image(model, prompt_text, images, parameters)
 
 
